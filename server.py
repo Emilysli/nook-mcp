@@ -86,5 +86,6 @@ def reply_annotation(book: str, chapter: str, annotation_id: str, reply: str) ->
         return json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False)
 
 if __name__ == "__main__":
+    import uvicorn
     print(f"nook-mcp (Streamable HTTP) starting on :{PORT}")
-    mcp.run(transport="sse", host="0.0.0.0", port=PORT)
+    uvicorn.run(mcp.app, host="0.0.0.0", port=PORT)
