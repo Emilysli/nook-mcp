@@ -43,15 +43,13 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._send_error(-32700, "Parse error")
             return
         
-        # 处理 JSON-RPC 协议
         req_id = req.get("id")
         method = req.get("method", "")
         params = req.get("params", {}) or {}
         
-        # 根据 method 分发
         if method == "initialize":
             self._send_result(req_id, {
-                "protocolVersion": "0.1.0",
+                "protocolVersion": "2024-11-05",       # ← 改好了
                 "capabilities": {
                     "tools": {},
                     "resources": {}
