@@ -49,7 +49,7 @@ class MCPHandler(BaseHTTPRequestHandler):
         
         if method == "initialize":
             self._send_result(req_id, {
-                "protocolVersion": "2024-11-05",       # ← 改好了
+                "protocolVersion": "2024-11-05",
                 "capabilities": {
                     "tools": {},
                     "resources": {}
@@ -126,7 +126,7 @@ class MCPHandler(BaseHTTPRequestHandler):
         elif method == "resources/list":
             self._send_result(req_id, {"resources": []})
         elif method == "notifications/initialized":
-            self._send_result(req_id, {})
+            return  # 通知不需要回复
         else:
             self._send_error(req_id, -32601, f"Method not found: {method}")
     
