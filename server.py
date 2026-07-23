@@ -2,18 +2,13 @@
 """nook-mcp：共读小屋 MCP 服务器——Starlette SSE 版"""
 
 import os, json, urllib.request, traceback
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
-from mcp.types import (
-    TextContent,
-    Tool,
-    CallToolResult,
-)
+from mcp.types import TextContent, Tool
 from starlette.applications import Starlette
-from starlette.routing import Mount, Route
+from starlette.routing import Route, Mount
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from sse_starlette.sse import EventSourceResponse
@@ -48,78 +43,42 @@ server = Server("nook-mcp")
 @server.list_tools()
 async def handle_list_tools() -> list[Tool]:
     return [
-        Tool(
-            name="list_pending",
-            description="列出所有还没回应的批注",
-            inputSchema={"type": "object", "properties": {}}
-        ),
-        Tool(
-            name="list_books",
-            description="列出共读小屋里的所有书",
-            inputSchema={"type": "object", "properties": {}}
-        ),
-        Tool(
-            name="get_chapter",
-            description="读取指定章节的内容",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "book": {"type": "string"},
-                    "chapter": {"type": "string"}
-                },
-                "required": ["book"]
-            }
-        ),
-        Tool(
-            name="get_note",
-            description="读取剧情笔记",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "book": {"type": "string"},
-                    "chapter": {"type": "string"}
-                },
-                "required": ["book"]
-            }
-        ),
-        Tool(
-            name="reply_annotation",
-            description="回应对应批注",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "book": {"type": "string"},
-                    "chapter": {"type": "string"},
-                    "annotation_id": {"type": "string"},
-                    "reply": {"type": "string"}
-                },
-                "required": ["book", "annotation_id", "reply"]
-            }
-        ),
+        Tool(name="list_pending", description="列出所有还没回应的批注",
+             inputSchema={"type": "object", "properties": {}}),
+        Tool(name="list_books", description="列出共读小屋里的所有书",
+             inputSchema={"type": "object", "properties": {}}),
+        Tool(name="get_chapter", description="读取指定章节的内容",
+             inputSchema={"type": "object", "properties": {
+                 "book": {"type": "string"}, "chapter": {"type": "string"}
+             }, "required": ["book"]}),
+        Tool(name="get_note", description="读取剧情笔记",
+             inputSchema={"type": "object", "properties": {
+                 "book": {"type": "string"}, "chapter": {"type": "string"}
+             }, "required": ["book"]}),
+        Tool(name="reply_annotation", description="回应对应批注",
+             inputSchema={"type": "object", "properties": {
+                 "book": {"type": "string"}, "chapter": {"type": "string"},
+                 "annotation_id": {"type": "string"}, "reply": {"type": "string"}
+             }, "required": ["book", "annotation_id", "reply"]}),
     ]
 
 def _run_tool(name: str, args: dict) -> str:
     try:
         if name == "list_pending":
-            pending = nook_get("/api/pending")
-            return json.dumps({"ok": True, "pending": pending}, ensure_ascii=False)
+            return json.dumps({"ok": True, "pending": nook_get("/api/pending")}, ensure_ascii=False)
         elif name == "list_books":
-            books = nook_get("/api/books")
-            return json.dumps({"ok": True, "books": books}, ensure_ascii=False)
+            return json.dumps({"ok": True, "books": nook_get("/api/books")}, ensure_ascii=False)
         elif name == "get_chapter":
-            ch = nook_get(f"/api/chapter/{args['book']}/{args.get('chapter', '')}")
-            return json.dumps({"ok": True, "chapter": ch}, ensure_ascii=False)
+            return json.dumps({"ok": True, "chapter": nook_get(f"/api/chapter/{args['book']}/{args.get('chapter', '')}")}, ensure_ascii=False)
         elif name == "get_note":
-            note = nook_get(f"/api/note/{args['book']}/{args.get('chapter', '')}")
-            return json.dumps({"ok": True, "note": note}, ensure_ascii=False)
+            return json.dumps({"ok": True, "note": nook_get(f"/api/note/{args['book']}/{args.get('chapter', '')}")}, ensure_ascii=False)
         elif name == "reply_annotation":
             url = f"/api/annotations/{args['book']}/{args.get('chapter', '')}"
             annos = nook_get(url)
             for a in annos:
                 if a["id"] == args["annotation_id"]:
                     a.setdefault("replies", []).append({
-                        "who": "ai",
-                        "text": args["reply"],
+                        "who": "ai", "text": args["reply"],
                         "ts": __import__("time").strftime("%Y-%m-%d %H:%M")
                     })
                     break
@@ -128,14 +87,12 @@ def _run_tool(name: str, args: dict) -> str:
         else:
             return json.dumps({"ok": False, "error": f"unknown tool: {name}"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"ok": False, "error": str(e), "trace": traceback.format_exc()}, ensure_ascii=False)
+        return json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False)
 
 @server.call_tool()
 async def handle_call_tool(name: str, arguments: dict) -> list[TextContent]:
-    result = _run_tool(name, arguments)
-    return [TextContent(type="text", text=result)]
+    return [TextContent(type="text", text=_run_tool(name, arguments))]
 
-# SSE transport setup
 from mcp.server.sse import SseServerTransport
 sse = SseServerTransport("/messages")
 
@@ -159,7 +116,7 @@ async def root(request: Request):
 
 app = Starlette(routes=[
     Route("/", endpoint=root),
-    Route("/sse", endpoint=handle_sse),
+    Route("/sse", endpoint=handle_sse, methods=["GET", "POST"]),  # ← 关键：改成同时支持 GET 和 POST
     Mount("/messages", routes=[
         Route("/", endpoint=handle_messages, methods=["POST"]),
     ]),
