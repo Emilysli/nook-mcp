@@ -29,6 +29,13 @@ def nook_post(path, data):
         return json.loads(r.read())
 
 class MCPHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        """健康检查"""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"ok")
+
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         try:
@@ -36,14 +43,14 @@ class MCPHandler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             params = {}
         
-        result = self.handle(params)
+        result = self.handle_action(params)          # ← 改这里
         resp = json.dumps(result, ensure_ascii=False).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(resp)
     
-    def handle(self, params):
+    def handle_action(self, params):                 # ← 改这里
         action = params.get("action", "")
         
         if action == "list_pending":
