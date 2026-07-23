@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
-"""nook-mcp：共读小屋 MCP 服务器——带调试日志版"""
+"""nook-mcp：共读小屋 MCP 服务器——精简版"""
 
 import os, sys, json, urllib.request, traceback
-from mcp.server.fastmcp import FastMCP
 
 NOOK_URL = os.environ.get("NOOK_URL", "").rstrip("/")
 NOOK_PASS = os.environ.get("NOOK_PASS", "")
 PORT = int(os.environ.get("PORT", 8001))
 
-print(f"[boot] NOOK_URL={NOOK_URL}")
-print(f"[boot] PORT={PORT}")
-print(f"[boot] starting FastMCP...")
+print(f"BOOT: NOOK_URL={NOOK_URL} PASS={'set' if NOOK_PASS else 'unset'} PORT={PORT}", flush=True)
+
+try:
+    from mcp.server.fastmcp import FastMCP
+    print("BOOT: FastMCP imported", flush=True)
+except Exception as e:
+    print(f"FATAL: cannot import FastMCP: {e}", flush=True)
+    sys.exit(1)
 
 mcp = FastMCP("nook-mcp")
 
+print("BOOT: FastMCP instance created", flush=True)
+
+# ---------- helpers ----------
 def nook_get(path):
     req = urllib.request.Request(
         f"{NOOK_URL}{path}",
@@ -34,6 +41,7 @@ def nook_post(path, data):
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
 
+# ---------- tools ----------
 @mcp.tool()
 def list_pending() -> str:
     try:
@@ -80,11 +88,11 @@ def reply_annotation(book: str, chapter: str, annotation_id: str, reply: str) ->
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False)
 
-print(f"[boot] tools registered, starting SSE on port {PORT}...")
+print("BOOT: all tools registered, entering run loop...", flush=True)
 
 if __name__ == "__main__":
     try:
         mcp.run(transport="sse")
     except Exception as e:
-        print(f"[fatal] {traceback.format_exc()}", file=sys.stderr)
+        print(f"FATAL: {traceback.format_exc()}", flush=True)
         sys.exit(1)
